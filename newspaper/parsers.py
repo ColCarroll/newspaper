@@ -108,24 +108,35 @@ class Parser(object):
         return None
 
     @classmethod
-    def getElementsByTag(
-            cls, node, tag=None, attr=None, value=None, childs=False, use_regex=False) -> list:
+    def findAll(cls, node, tag=None, attrs=None, childs=False, use_regex=False) -> list:
         NS = None
         # selector = tag or '*'
         selector = 'descendant-or-self::%s' % (tag or '*')
-        if attr and value:
+        if attrs:
             if use_regex:
                 NS = {"re": "http://exslt.org/regular-expressions"}
-                selector = '%s[re:test(@%s, "%s", "i")]' % (selector, attr, value)
+                selections = ['re:test(@%s, "%s", "i")' % (attr, value) for attr, value in attrs.items()]
             else:
-                trans = 'translate(@%s, "%s", "%s")' % (attr, string.ascii_uppercase, string.ascii_lowercase)
-                selector = '%s[contains(%s, "%s")]' % (selector, trans, value.lower())
+                selections = []
+                for attr, value in attrs.items():
+                    trans = 'translate(@%s, "%s", "%s")' % (attr, string.ascii_uppercase, string.ascii_lowercase)
+                    selections.append('contains(%s, "%s")' % (trans, value.lower()))
+            selector = '%s[%s]' % (selector, ' and '.join(selections))
         elems = node.xpath(selector, namespaces=NS)
         # remove the root node
         # if we have a selection tag
         if node in elems and (tag or childs):
             elems.remove(node)
         return elems
+
+    @classmethod
+    def getElementsByTag(
+            cls, node, tag=None, attr=None, value=None, childs=False, use_regex=False) -> list:
+        if attr and value:
+            attrs = {attr: value}
+        else:
+            attrs = None
+        return cls.findAll(node, tag=tag, attrs=attrs, childs=childs, use_regex=use_regex)
 
     @classmethod
     def appendChild(cls, node, child):
